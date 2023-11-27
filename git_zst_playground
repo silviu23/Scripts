@@ -1,0 +1,142 @@
+import git
+import os
+import shutil
+import zipfile                                  # used for zip unzip
+
+git_directory = 'D:\\Git_Python'
+
+
+def git_pull(repository_path):
+    try:
+        repo = git.Repo(repository_path)
+        origin = repo.remotes.origin
+        origin.pull()
+        print("Git pull completed successfully.")
+    except Exception as e:
+        print(f"Error running 'git pull': {e}")
+
+def get_git_repository_info(directory_path):
+    if not os.path.exists(directory_path):
+        os.makedirs(directory_path)
+    try:
+        # Attempt to open the repository at the specified path
+        repo = git.Repo(directory_path)
+
+        # Get the current branch
+        current_branch = repo.active_branch.name
+        print(f'Current branch: {current_branch}')
+
+        return True  # If successful, it's a Git repository, return True
+    except git.exc.InvalidGitRepositoryError:
+        return False  # If it's not a Git repository, return False and None for the repo name
+
+
+if get_git_repository_info(git_directory):
+    print(f"The directory at '{git_directory}' is a Git repository.")
+    git_pull(git_directory)
+else:
+    print(f"No Git repository found at '{git_directory}'.")
+    ssh_repository_url = 'git@github-vni.geo.conti.de:s3-bmw-gen5/sw.tool.zst.git'
+
+    repo = git.Repo.clone_from(ssh_repository_url,git_directory)
+    print(f'SSH Url: {ssh_repository_url} created at {git_directory}')
+    # Open the Git repository
+    repo = git.Repo(git_directory)
+
+    # Get the current branch
+    current_branch = repo.active_branch.name
+
+    print(f'Current branch: {current_branch}')
+
+
+
+def copy_file(source_file, destination_directory):
+    try:
+        shutil.copy2(source_file, destination_directory)
+        print(f"File '{source_file}' copied to '{destination_directory}'")
+    except Exception as e:
+        print(f"Error copying file: {e}")
+
+
+
+def search_directory(root_directory, target_directory_name):
+    results = []
+
+    for dirpath, dirnames, _ in os.walk(root_directory):
+        for dirname in dirnames:
+            # Normalize directory paths for comparison
+            normalized_dirname = os.path.normpath(dirname)
+            normalized_target_name = os.path.normpath(target_directory_name)
+
+            # Check if the normalized target name is in the normalized directory name
+            if normalized_target_name == normalized_dirname:
+                results.append(os.path.join(dirpath, dirname))
+
+    return results
+
+
+def search_specific_zip_file_in_directory(directory_path, target_filename):
+    for root, dirs, files in os.walk(directory_path):
+        for filename in files:
+            if filename.lower() == target_filename.lower() and filename.lower().endswith('.zip'):
+                return os.path.join(root, filename)
+    return None  # Return None if the target file is not found
+
+
+
+
+root_directory = r'\\cw01\\root\Loc\\bbuv\\did36231\\03_Prod_Dev\\50_Tools\\Zustandssteuerung Testautomatisierung (ZST)'
+
+
+def get_zst_version(ZST_Version):
+
+    if os.path.exists(root_directory):
+        print(f"The path '{root_directory}' is valid and exists.")
+    else:
+        print(f"The path '{root_directory}' is not valid or does not exist.")
+
+    found_directories = search_directory(root_directory, ZST_Version)
+    print('Result: ',found_directories)
+
+    if found_directories:
+        print(f"Found '{ZST_Version} version' in the following locations:")
+        for directory in found_directories:
+            print(directory)
+            print(found_directories[0])
+    else:
+        print(f"'{ZST_Version}' not found in any directories.")
+
+
+    ZST_zip_file = search_specific_zip_file_in_directory(found_directories[0],'ZST.zip')
+
+    if ZST_zip_file:
+        print(f"Found ZST.zip in the following locations: ", ZST_zip_file)
+    else:
+        print(f"ZST.zip not found in any directories.")
+
+    return ZST_zip_file
+
+####################################################################################################################
+def unzip_file(path_to_zip_file, targetDir):
+    """
+        :author:                    Christian Spahn 10.01.2017
+        :description:               unzip file into target directory
+        :param path_to_zip_file:    zipfile
+        :param targetDir:           destination directory
+        :return:                    void
+    """
+    # Solution for a path > 260 characters:
+    # https://msdn.microsoft.com/en-us/library/aa365247.aspx#maxpath
+    print(f"\n    unzip: {path_to_zip_file}")
+    zip_ref = zipfile.ZipFile('\\\\?\\' + os.path.abspath(path_to_zip_file), 'r')
+    zip_ref.extractall('\\\\?\\' + os.path.abspath(targetDir))
+    zip_ref.close()
+
+def copy_zst_zip_to_git_repo(ZST_Version):
+    ZST_zip = get_zst_version(ZST_Version)
+    dest_ZST_zip = copy_file(ZST_zip,git_directory)
+    return dest_ZST_zip
+
+dest_of_zip_file = copy_zst_zip_to_git_repo('3.13.8')
+unzip_file(dest_of_zip_file,git_directory)
+
